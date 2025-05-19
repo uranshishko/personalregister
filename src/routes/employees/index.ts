@@ -9,41 +9,56 @@ import {
   getAllEmployeesRoute,
 } from "./route-definitions";
 import { employeeSchema } from "../../models/zod-schemas";
+import { formatZodError } from "../../utils/error-formatter";
 
 export const createEmployeeRoutes = (services: AppServiceRegistry) => {
   const router = new OpenAPIHono();
 
   const employeeService = services.get(EmployeeService);
 
-  router.openapi(addEmployeeRoute, async (c) => {
-    const body = await c.req.json();
+  router.openapi(
+    addEmployeeRoute,
+    async (c) => {
+      const body = await c.req.json();
 
-    const parseResult = employeeSchema.strict().safeParse(body);
-    if (!parseResult.success) {
-      return c.json(
-        { success: false, error: parseResult.error.message } as const,
-        400,
-      );
-    }
+      const parseResult = employeeSchema.strict().safeParse(body);
+      if (!parseResult.success) {
+        return c.json(
+          { success: false, error: parseResult.error.message } as const,
+          400,
+        );
+      }
 
-    const id = uuidv4();
-    const { firstName, lastName, email } = parseResult.data;
-    const employee = await employeeService.add({
-      id,
-      firstName,
-      lastName,
-      email,
-    });
+      const id = uuidv4();
+      const { firstName, lastName, email } = parseResult.data;
+      const employee = await employeeService.add({
+        id,
+        firstName,
+        lastName,
+        email,
+      });
 
-    if (!employee) {
-      return c.json(
-        { success: false, error: "employee already exists" } as const,
-        409,
-      );
-    }
+      if (!employee) {
+        return c.json(
+          { success: false, error: "employee already exists" } as const,
+          409,
+        );
+      }
 
-    return c.json({ success: true, data: employee } as const, 201);
-  });
+      return c.json({ success: true, data: employee } as const, 201);
+    },
+    (result, c) => {
+      if (!result.success) {
+        return c.json(
+          {
+            success: false,
+            error: formatZodError(result.error),
+          } as const,
+          400,
+        );
+      }
+    },
+  );
 
   router.openapi(getAllEmployeesRoute, async (c) => {
     const employees = await employeeService.getAll();
